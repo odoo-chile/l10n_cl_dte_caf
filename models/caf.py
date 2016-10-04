@@ -84,6 +84,8 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
 
     @api.one
     def action_enable(self):
+        if not self.caf_file:
+            raise UserError('Debe Guardar el Caf primero')
         result = xmltodict.parse(
             base64.b64decode(self.caf_file).replace(
                 '<?xml version="1.0"?>','',1))['AUTORIZACION']['CAF']['DA']
@@ -123,8 +125,8 @@ class sequence_caf(models.Model):
     @api.model
     def _check_dte(self):
         for r in self:
-            obj = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)])
-            if obj:
+            objs = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)])
+            for obj in objs:
                 r.is_dte = obj.sii_document_class_id.dte and obj.sii_document_class_id.document_type in ['invoice', 'debit_note', 'credit_note','stock_picking']
     @api.model
     def _get_sii_document_class(self):
