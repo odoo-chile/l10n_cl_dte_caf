@@ -28,14 +28,14 @@ class caf(models.Model):
 
     _sql_constraints=[(
         'filename_unique','unique(filename)','Error! Filename Already Exist!')]
-        
+
     issued_date = fields.Date('Issued Date')
-    
+
     sii_document_class = fields.Integer('SII Document Class')
 
     start_nm = fields.Integer(
         string='Start Number', help='CAF Starts from this number')
-    
+
     final_nm = fields.Integer(
         string='End Number', help='CAF Ends to this number')
 
@@ -63,7 +63,7 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
     def _use_level(self):
         for r in self:
             if r.status not in ['draft','cancelled']:
-                try:            
+                try:
                     r.use_level = 100 * (float(r.sequence_id.number_next_actual - 1) / float(r.final_nm - r.start_nm + 1))
                 except ZeroDivisionError:
                     r.use_level = 0
@@ -76,7 +76,7 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
                     #r.status = 'in_use'
                     self.env.cr.execute("""UPDATE dte_caf SET status = 'in_use' WHERE filename = '%s'""" % r.filename)
                     print 'in_use'
-                
+
             else:
                 r.use_level = 0
 
@@ -84,6 +84,8 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
 
     @api.one
     def action_enable(self):
+        if not self.caf_file:
+            raise UserError('Debe Guardar el Caf primero')
         result = xmltodict.parse(
             base64.b64decode(self.caf_file).replace(
                 '<?xml version="1.0"?>','',1))['AUTORIZACION']['CAF']['DA']
@@ -96,7 +98,7 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
         if not self.sequence_id:
             raise Warning(_(
                 'You should select a DTE sequence before enabling this CAF record'))
-        elif self.rut_n != self.company_id.vat:
+        elif self.rut_n != self.company_id.vat.replace('L0','L'):
             raise Warning(_(
                 'Company vat %s should be the same that assigned company\'s vat: %s!') % (self.rut_n, self.company_id.vat))
         elif self.sii_document_class != self.sequence_id.sii_document_class:
@@ -119,29 +121,24 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
 
 class sequence_caf(models.Model):
     _inherit = "ir.sequence"
-    
+
+    @api.model
+    def _check_dte(self):
+        for r in self:
+            objs = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)])
+            for obj in objs:
+                r.is_dte = obj.sii_document_class_id.dte and obj.sii_document_class_id.document_type in ['invoice', 'debit_note', 'credit_note','stock_picking']
+    @api.model
+    def _get_sii_document_class(self):
+        for r in self:
+            obj = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)],limit=1)
+            if not obj: # si s guía de despacho
+                obj = self.env['stock.picking.type'].search([('sequence_id','=', r.id)])
+            r.sii_document_class = obj.sii_document_class_id.sii_code
+
     sii_document_class = fields.Integer('SII Code', readonly=True, compute='_get_sii_document_class')
 
     is_dte = fields.Boolean('IS DTE?', readonly=True, compute='_check_dte')
-    
+
     dte_caf_ids = fields.One2many(
         'dte.caf', 'sequence_id', 'DTE Caf')
-
-    @api.one
-    def _get_sii_document_class(self):
-        r = self
-        obj = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)])
-        r.sii_document_class = obj.sii_document_class_id.sii_code
-        
-
-    @api.one
-    def _check_dte(self):
-        r = self
-        obj = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)])
-        r.is_dte = obj.sii_document_class_id.dte and obj.sii_document_class_id.document_type in ['invoice', 'debit_note', 'credit_note']
-
-
-
-        
-
-    
