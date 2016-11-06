@@ -125,15 +125,17 @@ class sequence_caf(models.Model):
     @api.model
     def _check_dte(self):
         for r in self:
-            objs = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)])
-            for obj in objs:
+            obj = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)])
+            if not obj: # si s guía de despacho
+                obj = self.env['stock.location'].search([('sequence_id','=', r.id)],limit=1)
+            if obj:
                 r.is_dte = obj.sii_document_class_id.dte and obj.sii_document_class_id.document_type in ['invoice', 'debit_note', 'credit_note','stock_picking']
     @api.model
     def _get_sii_document_class(self):
         for r in self:
-            obj = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)],limit=1)
+            obj = self.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)],limit=1)
             if not obj: # si s guía de despacho
-                obj = self.env['stock.picking.type'].search([('sequence_id','=', r.id)])
+                obj = self.env['stock.location'].search([('sequence_id','=', r.id)],limit=1)
             r.sii_document_class = obj.sii_document_class_id.sii_code
 
     sii_document_class = fields.Integer('SII Code', readonly=True, compute='_get_sii_document_class')
