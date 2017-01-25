@@ -80,16 +80,12 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
             else:
                 r.use_level = 0
 
-
-
     @api.one
     def action_enable(self):
         if not self.caf_file:
             raise UserError('Debe Guardar el Caf primero')
-        result = xmltodict.parse(
-            base64.b64decode(self.caf_file).replace(
-                '<?xml version="1.0"?>','',1))['AUTORIZACION']['CAF']['DA']
-
+        xml = base64.b64decode(self.caf_file).decode('ISO-8859-1')
+        result = xmltodict.parse(xml)['AUTORIZACION']['CAF']['DA']
         self.start_nm = result['RNG']['D']
         self.final_nm = result['RNG']['H']
         self.sii_document_class = result['TD']
