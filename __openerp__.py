@@ -19,9 +19,8 @@
         'security/ir.model.access.csv',
     ],
     'update_xml': [],
-    'version': '0.0',
+    'version': '0.5',
     'website': 'http://blancomartin.cl',
     'auto-install': False,
     'active': False
 }
-# vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:

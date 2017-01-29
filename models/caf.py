@@ -2,6 +2,8 @@
 from openerp import models, fields, api
 from openerp.tools.translate import _
 from openerp.exceptions import Warning
+import logging
+_logger = logging.getLogger(__name__)
 
 try:
     import xmltodict
@@ -59,6 +61,34 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
 
     use_level = fields.Float(string="Use Level", compute='_use_level')
 
+    @api.onchange("caf_file",)
+    def load_caf(self, flags=False):
+        if not self.caf_file:
+            return
+        result = xmltodict.parse(
+            base64.b64decode(self.caf_file).replace(
+                '<?xml version="1.0"?>','',1))['AUTORIZACION']['CAF']['DA']
+
+        self.start_nm = result['RNG']['D']
+        self.final_nm = result['RNG']['H']
+        self.sii_document_class = result['TD']
+        self.issued_date = result['FA']
+        self.rut_n = 'CL' + result['RE'].replace('-','')
+        if not self.sequence_id:
+            raise Warning(_(
+                'You should select a DTE sequence before enabling this CAF record'))
+        elif self.rut_n != self.company_id.vat.replace('L0','L'):
+            raise Warning(_(
+                'Company vat %s should be the same that assigned company\'s vat: %s!') % (self.rut_n, self.company_id.vat))
+        elif self.sii_document_class != self.sequence_id.sii_document_class:
+            raise Warning(_(
+                '''SII Document Type for this CAF is %s and selected sequence associated document class is %s. This values should be equal for DTE Invoicing to work properly!''') % (self.sii_document_class, self.sequence_id.sii_document_class))
+        elif self.sequence_id.number_next_actual < self.start_nm or self.sequence_id.number_next_actual > self.final_nm:
+            raise Warning(_(
+                'Folio Number %s should be between %s and %s CAF Authorization Interval!') % (self.sequence_id.number_next_actual, self.start_nm, self.final_nm))
+        if flags:
+            return True
+
     @api.depends('start_nm', 'final_nm', 'sequence_id', 'status')
     def _use_level(self):
         for r in self:
@@ -80,45 +110,24 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
             else:
                 r.use_level = 0
 
-    @api.one
+    @api.multi
     def action_enable(self):
-        if not self.caf_file:
-            raise UserError('Debe Guardar el Caf primero')
-        xml = base64.b64decode(self.caf_file).decode('ISO-8859-1')
-        result = xmltodict.parse(xml)['AUTORIZACION']['CAF']['DA']
-        self.start_nm = result['RNG']['D']
-        self.final_nm = result['RNG']['H']
-        self.sii_document_class = result['TD']
-        self.issued_date = result['FA']
-        self.rut_n = 'CL' + result['RE'].replace('-','')
-        if not self.sequence_id:
-            raise Warning(_(
-                'You should select a DTE sequence before enabling this CAF record'))
-        elif self.rut_n != self.company_id.vat.replace('L0','L'):
-            raise Warning(_(
-                'Company vat %s should be the same that assigned company\'s vat: %s!') % (self.rut_n, self.company_id.vat))
-        elif self.sii_document_class != self.sequence_id.sii_document_class:
-            raise Warning(_(
-                '''SII Document Type for this CAF is %s and selected sequence associated document class is %s. This values should be equal for DTE Invoicing to work properly!''') % (self.sii_document_class, self.sequence_id.sii_document_class))
-        elif self.sequence_id.number_next_actual < self.start_nm or self.sequence_id.number_next_actual > self.final_nm:
-            raise Warning(_(
-                'Folio Number %s should be between %s and %s CAF Authorization Interval!') % (self.sequence_id.number_next_actual, self.start_nm, self.final_nm))
-        else:
+        #if self._check_caf():
+        if self.load_caf(flags=True):
             self.status = 'in_use'
 
-    @api.one
+    @api.multi
     def action_cancel(self):
         self.status = 'cancelled'
 
-    @api.one
     def _get_filename(self):
-        self.name = self.filename
+        for r in self:
+            r.name = r.filename
 
 
 class sequence_caf(models.Model):
     _inherit = "ir.sequence"
 
-    @api.model
     def _check_dte(self):
         for r in self:
             obj = r.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)], limit=1)
@@ -126,7 +135,7 @@ class sequence_caf(models.Model):
                 obj = self.env['stock.location'].search([('sequence_id','=', r.id)], limit=1)
             if obj:
                 r.is_dte = obj.sii_document_class_id.dte and obj.sii_document_class_id.document_type in ['invoice', 'debit_note', 'credit_note','stock_picking']
-    @api.model
+
     def _get_sii_document_class(self):
         for r in self:
             obj = self.env['account.journal.sii_document_class'].search([('sequence_id', '=', r.id)], limit=1)
