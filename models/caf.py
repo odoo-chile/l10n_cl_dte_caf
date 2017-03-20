@@ -143,9 +143,89 @@ class sequence_caf(models.Model):
                 obj = self.env['stock.location'].search([('sequence_id','=', r.id)], limit=1)
             r.sii_document_class = obj.sii_document_class_id.sii_code
 
-    sii_document_class = fields.Integer('SII Code', readonly=True, compute='_get_sii_document_class')
+    def get_qty_available(self, folio=None):
+        if not folio:
+            folio = self._get_folio()
+        try:
+            cafs = self.get_caf_files(folio)
+        except:
+            cafs = False
+        available = 0
+        if cafs:
+            for c in cafs:
+                inicial = int(c['AUTORIZACION']['CAF']['DA']['RNG']['D'])
+                final = int(c['AUTORIZACION']['CAF']['DA']['RNG']['H'])
+                if folio >= inicial and folio <= final:
+                    available += final - folio
+                else:
+                    available +=  final - inicial
+                available +=1
+        return available
 
-    is_dte = fields.Boolean('IS DTE?', readonly=True, compute='_check_dte')
+    def _qty_available(self):
+        for i in self:
+            i.qty_available = i.get_qty_available()
+
+    sii_document_class = fields.Integer('SII Code',
+        readonly=True,
+        compute='_get_sii_document_class')
+
+    is_dte = fields.Boolean('IS DTE?',
+        readonly=True,
+        compute='_check_dte')
 
     dte_caf_ids = fields.One2many(
-        'dte.caf', 'sequence_id', 'DTE Caf')
+        'dte.caf',
+        'sequence_id',
+        'DTE Caf')
+
+    qty_available = fields.Integer(
+        string="Quantity Available",
+        compute="_qty_available"
+    )
+
+    def _get_folio(self):
+        return self.number_next
+
+    def get_caf_files(self, folio=None):
+        if not folio:
+            folio = self._get_folio()
+        if not self.dte_caf_ids:
+            raise UserError(_('''There is no CAF file available or in use \
+for this Document. Please enable one.'''))
+        cafs = self.dte_caf_ids
+        sorted(cafs, key=lambda e: e.start_nm)
+        result = []
+        for caffile in cafs:
+            post = base64.b64decode(caffile.caf_file)
+            post = xmltodict.parse(post.replace(
+                '<?xml version="1.0"?>','',1))
+            folio_inicial = post['AUTORIZACION']['CAF']['DA']['RNG']['D']
+            folio_final = post['AUTORIZACION']['CAF']['DA']['RNG']['H']
+            if folio >= int(folio_inicial):
+                result.append(post)
+        if result:
+            return result
+        if folio > int(post['AUTORIZACION']['CAF']['DA']['RNG']['H']):
+            msg = '''El folio de este documento: {} está fuera de rango \
+del CAF vigente (desde {} hasta {}). Solicite un nuevo CAF en el sitio \
+www.sii.cl'''.format(folio, folio_inicial, folio_final)
+            # defino el status como "spent"
+            caffile.status = 'spent'
+            raise UserError(_(msg))
+        return False
+
+    def update_next_by_caf(self, folio=None):
+        menor = False
+        for c in self.get_caf_files(folio):
+            if not menor or int(d['AUTORIZACION']['CAF']['DA']['RNG']['D']) < int(menor['AUTORIZACION']['CAF']['DA']['RNG']['D']) :
+                menor = d
+        if menor and self.folio < int(menor['AUTORIZACION']['CAF']['DA']['RNG']['D']):
+            self.number_next = menor['AUTORIZACION']['CAF']['DA']['RNG']['D']
+
+    def _next_do(self):
+        folio = super(sequence_caf, self)._next_do()
+        if self.dte_caf_ids:
+            self.update_next_by_caf(folio)
+            folio = self.number_next
+        return folio
