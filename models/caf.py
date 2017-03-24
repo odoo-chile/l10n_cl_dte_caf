@@ -185,7 +185,7 @@ class sequence_caf(models.Model):
     )
 
     def _get_folio(self):
-        return self.number_next
+        return self.number_next_actual
 
     def get_caf_files(self, folio=None):
         if not folio:
@@ -218,14 +218,14 @@ www.sii.cl'''.format(folio, folio_inicial, folio_final)
     def update_next_by_caf(self, folio=None):
         menor = False
         for c in self.get_caf_files(folio):
-            if not menor or int(d['AUTORIZACION']['CAF']['DA']['RNG']['D']) < int(menor['AUTORIZACION']['CAF']['DA']['RNG']['D']) :
-                menor = d
-        if menor and self.folio < int(menor['AUTORIZACION']['CAF']['DA']['RNG']['D']):
-            self.number_next = menor['AUTORIZACION']['CAF']['DA']['RNG']['D']
+            if not menor or int(c['AUTORIZACION']['CAF']['DA']['RNG']['D']) < int(menor['AUTORIZACION']['CAF']['DA']['RNG']['D']) :
+                menor = c
+        if menor and folio < int(menor['AUTORIZACION']['CAF']['DA']['RNG']['D']):
+            self._alter_sequence(number_next=menor['AUTORIZACION']['CAF']['DA']['RNG']['D'])
 
     def _next_do(self):
         folio = super(sequence_caf, self)._next_do()
         if self.dte_caf_ids:
             self.update_next_by_caf(folio)
-            folio = self.number_next
+            folio = self.number_next_actual
         return folio
