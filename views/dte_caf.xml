@@ -22,9 +22,7 @@
                                 <field name="issued_date" readonly="1"/>
                                 <field name="use_level" widget="progressbar"/>
                                 <field name="status" readonly="1"/>
-                                <button string="Enable" type="object" name="action_enable"
-                                    status="draft" class="oe_highlight"
-                                    attrs="{'invisible':[('status','!=','draft')]}" />
+                                <button string="Enable" type="object" name="action_enable" class="oe_highlight" />
                             </tree>
                         </field>
                     </page>
@@ -55,9 +53,9 @@
                         <button string="Enable" type="object" name="action_enable"
                                 status="draft" class="oe_highlight"
                                 attrs="{'invisible':[('status','!=','draft')]}" />
-                                
+
                         <button string="Cancel" type="object" name="action_cancel"
-                                status="in_use" 
+                                status="in_use"
                                 attrs="{'invisible': [('status', '!=', 'in_use')]}" />
 
                         <field name="status" widget="statusbar"/>
@@ -121,24 +119,24 @@
             </field>
         </record>
         <!-- menu -->
-            
+
         <!-- menu -->
         <!-- <menuitem id="menu_act_partner_inventory" name="Partner Inventory" sequence="20"/> -->
-        
+
         <menuitem name="SII CAF Files for DTE"
-            id="menu_action_caf_files" 
-            action="action_caf_files" 
+            id="menu_action_caf_files"
+            action="action_caf_files"
             parent="l10n_cl_partner_activities.menu_sii_config"
             sequence="26"/>
 
 <!--        <menuitem name="SII CAF Files for DTE"
-            id="menu_action_caf_files" 
-            action="action_caf_files" 
-            parent="account.menu_finance_configuration" 
+            id="menu_action_caf_files"
+            action="action_caf_files"
+            parent="account.menu_finance_configuration"
             sequence="26"/>-->
 
 
-        <!--<menuitem id="menu_action_act_partner_inventory_portal" name="Partner Inventory" 
+        <!--<menuitem id="menu_action_act_partner_inventory_portal" name="Partner Inventory"
             action="action_partner_inventory" sequence="10" parent="base.config" />-->
 
              <!--parent="base.menu_config"-->
