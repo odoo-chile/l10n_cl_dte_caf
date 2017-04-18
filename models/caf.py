@@ -83,9 +83,6 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
         elif self.sii_document_class != self.sequence_id.sii_document_class:
             raise Warning(_(
                 '''SII Document Type for this CAF is %s and selected sequence associated document class is %s. This values should be equal for DTE Invoicing to work properly!''') % (self.sii_document_class, self.sequence_id.sii_document_class))
-        elif self.sequence_id.number_next_actual < self.start_nm or self.sequence_id.number_next_actual > self.final_nm:
-            raise Warning(_(
-                'Folio Number %s should be between %s and %s CAF Authorization Interval!') % (self.sequence_id.number_next_actual, self.start_nm, self.final_nm))
         if flags:
             return True
 
