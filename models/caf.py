@@ -203,9 +203,8 @@ for this Document. Please enable one.'''))
                 result.append(post)
         if result:
             return result
-        if folio > int(post['AUTORIZACION']['CAF']['DA']['RNG']['H']):
-            msg = '''El folio de este documento: {} está fuera de rango \
-del CAF vigente (desde {} hasta {}). Solicite un nuevo CAF en el sitio \
+        if folio > int(folio_inicial):
+            msg = '''Ya no existen CAFs para la secuencia actual {} . Solicite un nuevo CAF en el sitio \
 www.sii.cl'''.format(folio, folio_inicial, folio_final)
             # defino el status como "spent"
             caffile.status = 'spent'
