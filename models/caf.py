@@ -199,7 +199,7 @@ for this Document. Please enable one.'''))
                 '<?xml version="1.0"?>','',1))
             folio_inicial = post['AUTORIZACION']['CAF']['DA']['RNG']['D']
             folio_final = post['AUTORIZACION']['CAF']['DA']['RNG']['H']
-            if folio >= int(folio_inicial):
+            if folio <= int(folio_final):
                 result.append(post)
         if result:
             return result
