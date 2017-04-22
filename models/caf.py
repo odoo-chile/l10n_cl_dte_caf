@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from openerp import models, fields, api
 from openerp.tools.translate import _
-from openerp.exceptions import Warning
+from openerp.exceptions import UserError
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -75,13 +75,13 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
         self.issued_date = result['FA']
         self.rut_n = 'CL' + result['RE'].replace('-','')
         if not self.sequence_id:
-            raise Warning(_(
+            raise UserError(_(
                 'You should select a DTE sequence before enabling this CAF record'))
         elif self.rut_n != self.company_id.vat.replace('L0','L'):
-            raise Warning(_(
+            raise UserError(_(
                 'Company vat %s should be the same that assigned company\'s vat: %s!') % (self.rut_n, self.company_id.vat))
         elif self.sii_document_class != self.sequence_id.sii_document_class:
-            raise Warning(_(
+            raise UserError(_(
                 '''SII Document Type for this CAF is %s and selected sequence associated document class is %s. This values should be equal for DTE Invoicing to work properly!''') % (self.sii_document_class, self.sequence_id.sii_document_class))
         if flags:
             return True
@@ -121,6 +121,11 @@ has been exhausted. Cancelled means it has been deprecated by hand.''')
         for r in self:
             r.name = r.filename
 
+    def decode_caf(self):
+        post = base64.b64decode(self.caf_file)
+        post = xmltodict.parse(post.replace(
+            '<?xml version="1.0"?>','',1))
+        return post
 
 class sequence_caf(models.Model):
     _inherit = "ir.sequence"
@@ -148,15 +153,15 @@ class sequence_caf(models.Model):
         except:
             cafs = False
         available = 0
+        folio = int(folio)
         if cafs:
             for c in cafs:
-                inicial = int(c['AUTORIZACION']['CAF']['DA']['RNG']['D'])
-                final = int(c['AUTORIZACION']['CAF']['DA']['RNG']['H'])
-                if folio >= inicial and folio <= final:
-                    available += final - folio
-                else:
-                    available +=  final - inicial
-                available +=1
+                if folio >= c.start_nm and folio <= c.final_nm:
+                    available += c.final_nm - folio
+                elif folio <= c.final_nm:
+                    available +=  c.final_nm - c.start_nm
+                if folio > c.start_nm:
+                    available +=1
         return available
 
     def _qty_available(self):
@@ -184,6 +189,23 @@ class sequence_caf(models.Model):
     def _get_folio(self):
         return self.number_next_actual
 
+    def get_caf_file(self, folio=False):
+        caffiles = self.get_caf_fies()
+        if not caffiles:
+            raise UserError(_('''There is no CAF file available or in use \
+for this Document. Please enable one.'''))
+        folio = folio or self._get_folio()
+        for caffile in caffiles:
+            if int(folio) >= caffile.start_nm and int(folio) <= caffile.final_nm:
+                return cafffile.decode_caf()
+        if int(folio) > caffile.final_nm:
+            msg = '''No Hay caf para el documento: {}, está fuera de rango . Solicite un nuevo CAF en el sitio \
+www.sii.cl'''.format(folio)
+            # defino el status como "spent"
+            #caffile.status = 'spent'
+            raise UserError(_(msg))
+        return False
+
     def get_caf_files(self, folio=None):
         if not folio:
             folio = self._get_folio()
@@ -194,30 +216,26 @@ for this Document. Please enable one.'''))
         sorted(cafs, key=lambda e: e.start_nm)
         result = []
         for caffile in cafs:
-            post = base64.b64decode(caffile.caf_file)
-            post = xmltodict.parse(post.replace(
-                '<?xml version="1.0"?>','',1))
-            folio_inicial = post['AUTORIZACION']['CAF']['DA']['RNG']['D']
-            folio_final = post['AUTORIZACION']['CAF']['DA']['RNG']['H']
-            if folio <= int(folio_final):
-                result.append(post)
+            if int(folio) <= caffile.final_nm:
+                result.append(caffile)
         if result:
             return result
-        if folio > int(folio_inicial):
+        if int(folio) > caffile.final_nm:
             msg = '''Ya no existen CAFs para la secuencia actual {} . Solicite un nuevo CAF en el sitio \
-www.sii.cl'''.format(folio, folio_inicial, folio_final)
+www.sii.cl'''.format(folio)
             # defino el status como "spent"
-            caffile.status = 'spent'
+            #caffile.status = 'spent'
             raise UserError(_(msg))
         return False
 
     def update_next_by_caf(self, folio=None):
         menor = False
-        for c in self.get_caf_files(folio):
-            if not menor or int(c['AUTORIZACION']['CAF']['DA']['RNG']['D']) < int(menor['AUTORIZACION']['CAF']['DA']['RNG']['D']) :
+        cafs = self.get_caf_files(folio)
+        for c in cafs:
+            if not menor or c.start_nm < menor.start_nm:
                 menor = c
-        if menor and folio < int(menor['AUTORIZACION']['CAF']['DA']['RNG']['D']):
-            self._alter_sequence(number_next=menor['AUTORIZACION']['CAF']['DA']['RNG']['D'])
+        if menor and folio < menor.start_nm:
+            self.write({'number_next': menor.start_nm})
 
     def _next_do(self):
         folio = super(sequence_caf, self)._next_do()
