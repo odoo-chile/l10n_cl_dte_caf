@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from openerp import models, fields, api
+from openerp import models, fields, api, SUPERUSER_ID
 from openerp.tools.translate import _
 from openerp.exceptions import UserError
 import logging
@@ -108,12 +108,12 @@ has been exhausted. Cancelled means it has been deprecated by hand.''', )
         if flags:
             return True
         self.status = 'in_use'
+        self._use_level()
 
     def _use_level(self):
         for r in self:
             if r.status not in ['draft','cancelled']:
                 folio = r.sequence_id.number_next_actual
-                _logger.info(int(folio))
                 try:
                     r.use_level = 100.0 * ((int(folio) - r.start_nm) / float(r.final_nm - r.start_nm + 1))
                 except ZeroDivisionError:
@@ -204,14 +204,14 @@ class sequence_caf(models.Model):
         return self.number_next_actual
 
     def get_caf_file(self, folio=False):
-        caffiles = self.get_caf_fies()
+        caffiles = self.get_caf_files()
         if not caffiles:
             raise UserError(_('''There is no CAF file available or in use \
 for this Document. Please enable one.'''))
         folio = folio or self._get_folio()
         for caffile in caffiles:
             if int(folio) >= caffile.start_nm and int(folio) <= caffile.final_nm:
-                return cafffile.decode_caf()
+                return caffile.decode_caf()
         if int(folio) > caffile.final_nm:
             msg = '''No Hay caf para el documento: {}, está fuera de rango . Solicite un nuevo CAF en el sitio \
 www.sii.cl'''.format(folio)
@@ -249,7 +249,7 @@ www.sii.cl'''.format(folio)
             if not menor or c.start_nm < menor.start_nm:
                 menor = c
         if menor and folio < menor.start_nm:
-            self.write({'number_next': menor.start_nm})
+            self.sudo(SUPERUSER_ID).write({'number_next': menor.start_nm})
 
     def _next_do(self):
         folio = super(sequence_caf, self)._next_do()
