@@ -243,12 +243,13 @@ www.sii.cl'''.format(folio)
         return False
 
     def update_next_by_caf(self, folio=None):
+        folio = folio or self._get_folio()
         menor = False
         cafs = self.get_caf_files(folio)
         for c in cafs:
             if not menor or c.start_nm < menor.start_nm:
                 menor = c
-        if menor and folio < menor.start_nm:
+        if menor and int(folio) < menor.start_nm:
             self.sudo(SUPERUSER_ID).write({'number_next': menor.start_nm})
 
     def _next_do(self):
