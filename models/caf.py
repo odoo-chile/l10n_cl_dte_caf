@@ -256,5 +256,5 @@ www.sii.cl'''.format(folio)
         folio = super(sequence_caf, self)._next_do()
         if self.dte_caf_ids:
             self.update_next_by_caf(folio)
-            folio = self.number_next_actual
+            folio = self.get_next_char(self.number_next -1)
         return folio
