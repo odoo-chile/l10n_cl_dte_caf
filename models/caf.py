@@ -199,6 +199,10 @@ class sequence_caf(models.Model):
         string="Quantity Available",
         compute="_qty_available"
     )
+    forced_by_caf = fields.Boolean(
+        string="Forced By CAF",
+        default=True,
+    )
 
     def _get_folio(self):
         return self.number_next_actual
@@ -254,7 +258,10 @@ www.sii.cl'''.format(folio)
 
     def _next_do(self):
         folio = super(sequence_caf, self)._next_do()
-        if self.dte_caf_ids:
+        if self.forced_by_caf and self.dte_caf_ids:
             self.update_next_by_caf(folio)
-            folio = self.number_next_actual
+            number_next = self.number_next
+            if self.implementation != 'standard':
+                number_next -= 1
+            folio = self.get_next_char(number_next)
         return folio
