@@ -62,3 +62,8 @@ msgstr "Número final"
 #: model:ir.model.fields,field_description:l10n_cl_dte_caf.field_dte_caf_use_level
 msgid "Use Level"
 msgstr "Nivel de uso"
+
+#. module: l10n_cl_dte_caf
+#: model:ir.model.fields,field_description:l10n_cl_dte_caf.field_dte_caf_forced_by_caf
+msgid "Force secquence  by CAF"
+msgstr "Forzar Secuencia por CAF"
