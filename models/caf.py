@@ -208,7 +208,7 @@ class sequence_caf(models.Model):
         return self.number_next_actual
 
     def get_caf_file(self, folio=False):
-        caffiles = self.get_caf_files()
+        caffiles = self.get_caf_files(folio)
         if not caffiles:
             raise UserError(_('''There is no CAF file available or in use \
 for this Document. Please enable one.'''))
@@ -261,7 +261,5 @@ www.sii.cl'''.format(folio)
         if self.forced_by_caf and self.dte_caf_ids:
             self.update_next_by_caf(folio)
             number_next = self.number_next
-            if self.implementation != 'standard':
-                number_next -= 1
             folio = self.get_next_char(number_next)
         return folio
