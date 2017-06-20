@@ -160,8 +160,7 @@ class sequence_caf(models.Model):
             r.sii_document_class = obj.sii_document_class_id.sii_code
 
     def get_qty_available(self, folio=None):
-        if not folio:
-            folio = self._get_folio()
+        folio = folio or self._get_folio()
         try:
             cafs = self.get_caf_files(folio)
         except:
@@ -208,11 +207,11 @@ class sequence_caf(models.Model):
         return self.number_next_actual
 
     def get_caf_file(self, folio=False):
+        folio = folio or self._get_folio()
         caffiles = self.get_caf_files(folio)
         if not caffiles:
             raise UserError(_('''There is no CAF file available or in use \
 for this Document. Please enable one.'''))
-        folio = folio or self._get_folio()
         for caffile in caffiles:
             if int(folio) >= caffile.start_nm and int(folio) <= caffile.final_nm:
                 return caffile.decode_caf()
@@ -225,8 +224,7 @@ www.sii.cl'''.format(folio)
         return False
 
     def get_caf_files(self, folio=None):
-        if not folio:
-            folio = self._get_folio()
+        folio = folio or self._get_folio()
         if not self.dte_caf_ids:
             raise UserError(_('''There is no CAF file available or in use \
 for this Document. Please enable one.'''))
@@ -257,9 +255,11 @@ www.sii.cl'''.format(folio)
             self.sudo(SUPERUSER_ID).write({'number_next': menor.start_nm})
 
     def _next_do(self):
+        number_next = self.number_next
         folio = super(sequence_caf, self)._next_do()
         if self.forced_by_caf and self.dte_caf_ids:
             self.update_next_by_caf(folio)
-            number_next = self.number_next
+            if number_next +1 != self.number_next: #Fue actualizado
+                number_next = self.number_next
             folio = self.get_next_char(number_next)
         return folio
