@@ -241,6 +241,8 @@ for this Document. Please enable one.'''))
         folio = folio or self._get_folio()
         menor = False
         cafs = self.get_caf_files(folio)
+        if not cafs:
+            raise UserError(_('No quedan CAFs disponibles'))
         for c in cafs:
             if not menor or c.start_nm < menor.start_nm:
                 menor = c

@@ -19,7 +19,7 @@
         'security/ir.model.access.csv',
     ],
     'update_xml': [],
-    'version': '9.0.6.7',
+    'version': '9.0.6.8',
     'website': 'http://blancomartin.cl',
     'auto-install': False,
     'active': False

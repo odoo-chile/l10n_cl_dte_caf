@@ -100,6 +100,7 @@
                     <field name="start_nm" />
                     <field name="final_nm" />
                     <field name="company_id" />
+                    <field name="use_level" />
                     <field name="status" />
                     <!-- <field name="caf_file" />-->
                 </tree>
