@@ -90,7 +90,7 @@ has been exhausted. Cancelled means it has been deprecated by hand.''',
         )
     use_level = fields.Float(
             string="Use Level",
-            compute='_use_level',
+            compute='_used_level',
         )
 
     _sql_constraints=[(
