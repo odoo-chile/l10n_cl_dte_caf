@@ -15,9 +15,8 @@ try:
 except ImportError:
     pass
 
-
-
 class caf(models.Model):
+    _name = 'dte.caf'
 
     @api.depends('caf_file')
     def _compute_data(self):
@@ -25,69 +24,77 @@ class caf(models.Model):
             if caf:
                 caf.load_caf()
 
-    _name = 'dte.caf'
-
-    name = fields.Char('File Name',
-       readonly=True,
-       compute='_get_filename')
-
-    filename = fields.Char('File Name')
-
+    name = fields.Char(
+            string='File Name',
+           readonly=True,
+           compute='_get_filename',
+       )
+    filename = fields.Char(
+            'File Name',
+        )
     caf_file = fields.Binary(
-        string='CAF XML File',
-        filters='*.xml',
-        required=True,
-        help='Upload the CAF XML File in this holder')
+            string='CAF XML File',
+            filters='*.xml',
+            required=True,
+            help='Upload the CAF XML File in this holder',
+        )
+    issued_date = fields.Date(
+            string='Issued Date',
+            compute='_compute_data',
+            store=True,
+        )
+    sii_document_class = fields.Integer(
+            string='SII Document Class',
+            compute='_compute_data',
+            store=True,
+        )
+    start_nm = fields.Integer(
+            string='Start Number',
+            help='CAF Starts from this number',
+            compute='_compute_data',
+            store=True,
+        )
+    final_nm = fields.Integer(
+            string='End Number',
+            help='CAF Ends to this number',
+            compute='_compute_data',
+            store=True,
+        )
+    status = fields.Selection(
+            [
+                ('draft', 'Draft'),
+                ('in_use', 'In Use'),
+                ('spent', 'Spent')
+            ],
+            string='Status',
+            default='draft',
+            help='''Draft: means it has not been used yet. You must put in in used
+in order to make it available for use. Spent: means that the number interval
+has been exhausted. Cancelled means it has been deprecated by hand.''',
+        )
+    rut_n = fields.Char(
+            string='RUT',
+            compute='_compute_data',
+            store=True,
+        )
+    company_id = fields.Many2one(
+            'res.company',
+            string='Company',
+            required=False,
+            default=lambda self: self.env.user.company_id,
+        )
+    sequence_id = fields.Many2one(
+            'ir.sequence',
+            string='Sequence',
+            required=True,
+        )
+    use_level = fields.Float(
+            string="Use Level",
+            compute='_used_level',
+        )
 
     _sql_constraints=[(
         'filename_unique','unique(filename)','Error! Filename Already Exist!')]
-
-    issued_date = fields.Date('Issued Date',
-        compute='_compute_data',
-        store=True,)
-
-    sii_document_class = fields.Integer('SII Document Class',
-        compute='_compute_data',
-        store=True, )
-
-    start_nm = fields.Integer(
-        string='Start Number',
-        help='CAF Starts from this number',
-        compute='_compute_data',
-        store=True, )
-
-    final_nm = fields.Integer(
-        string='End Number',
-        help='CAF Ends to this number',
-        compute='_compute_data',
-        store=True, )
-
-    status = fields.Selection([
-        ('draft', 'Draft'),
-        ('in_use', 'In Use'),
-        ('spent', 'Spent'),
-        ('cancelled', 'Cancelled')], string='Status',
-        default='draft',
-        help='''Draft: means it has not been used yet. You must put in in used
-in order to make it available for use. Spent: means that the number interval
-has been exhausted. Cancelled means it has been deprecated by hand.''', )
-
-    rut_n = fields.Char(string='RUT',
-        compute='_compute_data',
-        store=True, )
-
-    company_id = fields.Many2one(
-        'res.company',
-        string='Company',
-        required=False,
-        default=lambda self: self.env.user.company_id)
-
-    sequence_id = fields.Many2one(
-        'ir.sequence',
-        'Sequence',
-        required=True)
-
-    use_level = fields.Float(string="Use Level", compute='_use_level')
 
     @api.onchange("caf_file",)
     def load_caf(self, flags=False):
@@ -108,11 +115,11 @@ has been exhausted. Cancelled means it has been deprecated by hand.''', )
         if flags:
             return True
         self.status = 'in_use'
-        self._use_level()
+        self._used_level()
 
-    def _use_level(self):
+    def _used_level(self):
         for r in self:
-            if r.status not in ['draft','cancelled']:
+            if r.status not in [ 'draft' ]:
                 folio = r.sequence_id.number_next_actual
                 try:
                     r.use_level = 100.0 * ((int(folio) - r.start_nm) / float(r.final_nm - r.start_nm + 1))
@@ -120,16 +127,6 @@ has been exhausted. Cancelled means it has been deprecated by hand.''', )
                     r.use_level = 0
             else:
                 r.use_level = 0
-
-    @api.multi
-    def action_enable(self):
-        #if self._check_caf():
-        if self.load_caf(flags=True):
-            self.status = 'in_use'
-
-    @api.multi
-    def action_cancel(self):
-        self.status = 'cancelled'
 
     def _get_filename(self):
         for r in self:
@@ -160,8 +157,7 @@ class sequence_caf(models.Model):
             r.sii_document_class = obj.sii_document_class_id.sii_code
 
     def get_qty_available(self, folio=None):
-        if not folio:
-            folio = self._get_folio()
+        folio = folio or self._get_folio()
         try:
             cafs = self.get_caf_files(folio)
         except:
@@ -208,25 +204,23 @@ class sequence_caf(models.Model):
         return self.number_next_actual
 
     def get_caf_file(self, folio=False):
-        caffiles = self.get_caf_files()
+        folio = folio or self._get_folio()
+        caffiles = self.get_caf_files(folio)
         if not caffiles:
             raise UserError(_('''There is no CAF file available or in use \
 for this Document. Please enable one.'''))
-        folio = folio or self._get_folio()
         for caffile in caffiles:
             if int(folio) >= caffile.start_nm and int(folio) <= caffile.final_nm:
                 return caffile.decode_caf()
-        if int(folio) > caffile.final_nm:
-            msg = '''No Hay caf para el documento: {}, está fuera de rango . Solicite un nuevo CAF en el sitio \
+        msg = '''No Hay caf para el documento: {}, está fuera de rango . Solicite un nuevo CAF en el sitio \
 www.sii.cl'''.format(folio)
-            # defino el status como "spent"
-            #caffile.status = 'spent'
-            raise UserError(_(msg))
-        return False
+        raise UserError(_(msg))
 
     def get_caf_files(self, folio=None):
-        if not folio:
-            folio = self._get_folio()
+        '''
+            Devuelvo caf actual y futuros
+        '''
+        folio = folio or self._get_folio()
         if not self.dte_caf_ids:
             raise UserError(_('''There is no CAF file available or in use \
 for this Document. Please enable one.'''))
@@ -238,18 +232,14 @@ for this Document. Please enable one.'''))
                 result.append(caffile)
         if result:
             return result
-        if int(folio) > caffile.final_nm:
-            msg = '''Ya no existen CAFs para la secuencia actual {} . Solicite un nuevo CAF en el sitio \
-www.sii.cl'''.format(folio)
-            # defino el status como "spent"
-            #caffile.status = 'spent'
-            raise UserError(_(msg))
         return False
 
     def update_next_by_caf(self, folio=None):
         folio = folio or self._get_folio()
         menor = False
         cafs = self.get_caf_files(folio)
+        if not cafs:
+            raise UserError(_('No quedan CAFs disponibles'))
         for c in cafs:
             if not menor or c.start_nm < menor.start_nm:
                 menor = c
@@ -257,11 +247,16 @@ www.sii.cl'''.format(folio)
             self.sudo(SUPERUSER_ID).write({'number_next': menor.start_nm})
 
     def _next_do(self):
+        number_next = self.number_next
+        if self.implementation == 'standard':
+            number_next = self.number_next_actual
         folio = super(sequence_caf, self)._next_do()
         if self.forced_by_caf and self.dte_caf_ids:
             self.update_next_by_caf(folio)
-            number_next = self.number_next
-            if self.implementation != 'standard':
-                number_next -= 1
+            actual = self.number_next
+            if self.implementation == 'standard':
+                actual = self.number_next_actual
+            if number_next +1 != actual: #Fue actualizado
+                number_next = actual
             folio = self.get_next_char(number_next)
         return folio
